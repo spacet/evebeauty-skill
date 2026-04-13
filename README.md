@@ -1,156 +1,121 @@
-# EveBeauty Skill 使用说明
+# EveBeauty Skill - 伊芙丽格医美客服助手
+
+> 一个兼容多平台的 AI Agent Skill，提供伊芙丽格医疗美容机构的客服查询服务。
+
+## 兼容平台
+
+本 Skill 基于 **SKILL.md 开放标准** 编写，兼容以下平台：
+
+| 平台 | 兼容性 | 安装路径 | 说明 |
+|------|--------|----------|------|
+| **Claude Code** | ✅ 原生支持 | `~/.claude/skills/evebeauty-skill/` | SKILL.md 标准制定者 |
+| **OpenClaw / Qclaw** | ✅ 原生支持 | `~/.agents/skills/evebeauty-skill/` 或 `~/.openclaw/skills/` | SKILL.md 标准采用者 |
+| **Qwen Code** | ✅ 原生支持 | `~/.qwen/skills/evebeauty-skill/` | 兼容 SKILL.md 标准 |
+| **OpenAI Codex** | ✅ 原生支持 | `~/.codex/skills/evebeauty-skill/` | SKILL.md 标准采用者 |
+| **Cursor** | ⚙️ 需适配器 | `.cursor/rules/evebeauty.mdc` | 提供专用适配文件 |
+
+## 功能
+
+- 机构信息查询（地址、电话、营业时间、停车）
+- 项目介绍（痘坑修复、清新微波除腋汗腋臭）
+- 医生介绍（吴凌燕院长、刘兰兰主任）
+- 术后护理注意事项查询
+
+## 数据架构
+
+**数据与 Skill 完全解耦**，所有数据来自外部源：
+
+```
+数据源 → scripts/fetch_info.py → Agent 回复
+```
+
+| 数据源 | 配置 | 更新方式 |
+|--------|------|----------|
+| GitHub Raw | `data_source: github` | 修改 JSON 并提交，实时同步 |
+| 本地 JSON | `data_source: local` | 替换 `data/info.json` |
+| 腾讯文档 | `data_source: tencent_docs` | 表格中直接修改（需 API） |
+
+**核心优势：更新数据无需修改任何 Skill 文件。**
+
+## 快速开始
+
+### 1. 安装
+
+**Claude Code / OpenClaw / Qwen Code / Codex：**
+```bash
+# 克隆或复制到此平台的标准 Skill 路径
+git clone https://github.com/spacet/evebeauty-skill.git ~/.agents/skills/evebeauty-skill
+```
+
+**Cursor：**
+```bash
+# 复制适配文件到项目规则目录
+cp adapters/cursor/rules/evebeauty.mdc .cursor/rules/
+```
+
+### 2. 使用
+
+安装后，直接询问即可：
+- "伊芙丽格在哪？"
+- "痘坑修复怎么做的？"
+- "吴凌燕医生怎么样？"
+- "清新微波术后要注意什么？"
+
+### 3. 验证
+
+```bash
+cd evebeauty-skill
+python scripts/fetch_info.py --query "地址"
+python scripts/fetch_info.py --query "痘坑修复"
+python scripts/fetch_info.py --query "吴凌燕"
+```
 
 ## 目录结构
 
 ```
 evebeauty-skill/
-├── skill.json              ← Skill 元数据（几乎不变）
-├── SKILL.md                ← Agent 入口指令（几乎不变）
-├── README.md               ← 本文件
+├── SKILL.md                    ← 通用标准文件（Claude/OpenClaw/Qwen/Codex）
+├── skill.json                  ← Qwen Code 专用元数据（可选）
+├── README.md                   ← 本文件
 ├── scripts/
-│   └── fetch_info.py       ← 数据查询脚本
-└── data/
-    ├── config.json         ← 当前配置
-    ├── config.example.json ← 配置示例
-    ├── info.json           ← 本地数据（local模式用）
-    └── 腾讯文档模板.md      ← 表格填写模板
+│   └── fetch_info.py           ← 通用查询脚本（Python 标准库）
+├── data/
+│   ├── config.json             ← 数据源配置
+│   └── info.json               ← 示例数据
+└── adapters/
+    └── cursor/
+        └── rules/
+            └── evebeauty.mdc   ← Cursor 专用适配文件
 ```
-
-## 快速开始
-
-### 1. 当前状态（本地 JSON 模式）
-
-数据已预装在 `data/info.json`，可直接使用：
-
-```bash
-python scripts/fetch_info.py --query "地址在哪"
-python scripts/fetch_info.py --query "痘坑修复"
-python scripts/fetch_info.py --query "吴凌燕"
-```
-
-### 2. 迁移到 GitHub Raw 模式（推荐）
-
-**优势：** 改数据只需提交 GitHub，Skill 自动同步，无需改 Skill 文件。
-
-**步骤：**
-
-1. **创建 GitHub 仓库**
-   - 新建仓库，如 `evebeauty-data`
-   - 上传 `data/info.json` 到仓库根目录
-
-2. **获取 Raw URL**
-   ```
-   https://raw.githubusercontent.com/YOUR_USERNAME/evebeauty-data/main/info.json
-   ```
-
-3. **修改配置**
-   编辑 `data/config.json`：
-   ```json
-   {
-     "data_source": "github",
-     "github_raw_url": "https://raw.githubusercontent.com/YOUR_USERNAME/evebeauty-data/main/info.json"
-   }
-   ```
-
-4. **测试**
-   ```bash
-   python scripts/fetch_info.py --query "地址"
-   ```
-
-**后续更新数据：**
-- 在 GitHub 仓库修改 `info.json` 并提交
-- Skill 自动拉取最新版本，无需任何改动
-
-### 3. 其他数据源方案
-
-| 方案 | 配置 | 说明 |
-|------|------|------|
-| 本地 JSON | `"data_source": "local"` | 替换 `info.json` 文件 |
-| GitHub Raw | `"data_source": "github"` | 修改 JSON 并提交 |
-| 腾讯文档 | `"data_source": "tencent_docs"` | 需 API 权限（待实现） |
 
 ## 数据格式
 
-`info.json` 结构：
+`data/info.json` 结构：
 
 ```json
 {
-  "institution": {
-    "address": "地址",
-    "phone": "电话",
-    "hours": "营业时间",
-    "parking": "停车信息",
-    "map_search": "地图搜索关键词"
-  },
-  "doctors": [
-    {
-      "name": "医生姓名",
-      "title": "职称",
-      "description": "详细介绍"
-    }
-  ],
-  "projects": [
-    {
-      "name": "项目名称",
-      "description": "项目介绍"
-    }
-  ],
-  "care_instructions": [
-    {
-      "project": "项目名称",
-      "post_care": "术后注意事项"
-    }
-  ]
+  "institution": { "address": "...", "phone": "...", "hours": "..." },
+  "doctors": [{ "name": "...", "title": "...", "description": "..." }],
+  "projects": [{ "name": "...", "description": "..." }],
+  "care_instructions": [{ "project": "...", "post_care": "..." }]
 }
 ```
 
-## 常见问题
+## 自定义扩展
 
-### Q: 如何添加新医生/新项目？
-A: 在 `info.json` 对应数组中添加对象即可，如：
+### 添加新字段
+1. 在 `data/info.json` 中添加新键值对
+2. 脚本自动返回，无需修改代码
+3. 如需智能查询，告诉我关键词，我更新映射
+
+### 添加新项目/医生
+在对应数组中添加对象即可，如：
 ```json
 {
-  "doctors": [
-    ...existing,
-    {
-      "name": "新医生",
-      "title": "职称",
-      "description": "介绍"
-    }
-  ]
+  "doctors": [...existing, { "name": "新医生", "title": "...", "description": "..." }]
 }
 ```
 
-### Q: 地址/电话变了怎么办？
-A: 修改 `institution` 对象中的对应字段，提交后即刻生效（GitHub 模式）。
+## License
 
-### Q: 可以加新字段吗？
-A: 可以。在 JSON 中添加新字段后，脚本会自动返回。如需智能查询，告诉我字段含义，我更新脚本的关键词映射。
-
-### Q: 腾讯文档 API 什么时候能用？
-A: 需要腾讯文档开放平台权限。如需对接，可联系我实现。
-
-## 测试脚本
-
-```bash
-# 测试全部查询
-python scripts/fetch_info.py --query "测试"
-
-# 测试机构信息
-python scripts/fetch_info.py --query "地址" --type institution
-
-# 测试医生信息
-python scripts/fetch_info.py --query "吴凌燕"
-
-# 测试项目介绍
-python scripts/fetch_info.py --query "痘坑"
-
-# 测试术后护理
-python scripts/fetch_info.py --query "术后" --type care
-```
-
-## 发布准备
-
-1. 确保 `skill.json` 中信息准确
-2. 上传到 GitHub 仓库
-3. 用户可通过 Qwen Code 安装使用
+MIT
