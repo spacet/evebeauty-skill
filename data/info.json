@@ -10,12 +10,14 @@
     {
       "name": "吴凌燕",
       "title": "院长",
-      "description": "创始人、北京首批美容皮肤科主诊医师、《面部危险区》译者、各大品牌导师，荣誉众多"
+      "description": "创始人、北京首批美容皮肤科主诊医师、《面部危险区》译者、各大品牌导师，荣誉众多",
+      "image_path": "assets/images/wu-lingyan.jpg"
     },
     {
       "name": "刘兰兰",
       "title": "光电主任",
-      "description": "持有舒敏超玛吉、Fotona4D、热玛吉、miraDry等多项认证"
+      "description": "持有舒敏超玛吉、Fotona4D、热玛吉、miraDry等多项认证",
+      "image_path": "assets/images/liu-lanlan.jpg"
     }
   ],
   "projects": [

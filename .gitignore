@@ -30,3 +30,7 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+
+# Large files (>1MB, use Git LFS if needed)
+*.psd
+*.ai
