@@ -75,7 +75,7 @@ def fetch_from_tencent_docs(config: dict) -> dict:
 def query_info(query_type: str, keyword: str = None, config: dict = None):
     """
     查询信息
-    
+
     Args:
         query_type: 查询类型 (institution/doctor/project/care/all)
         keyword: 关键词
@@ -83,9 +83,9 @@ def query_info(query_type: str, keyword: str = None, config: dict = None):
     """
     if config is None:
         config = load_config()
-    
+
     data_source = config.get("data_source", "local")
-    
+
     # 根据数据源获取数据
     if data_source == "github":
         github_url = config.get("github_raw_url")
@@ -97,29 +97,31 @@ def query_info(query_type: str, keyword: str = None, config: dict = None):
     else:  # local
         data_file = config.get("data_file", "info.json")
         data = fetch_from_local_json(data_file)
-    
+
     # 根据query_type筛选
     if query_type != "all" and query_type in data:
         result = data[query_type]
     else:
         result = data  # 返回全部
-    
+
     # 如果有keyword，进一步筛选
+    # 动态匹配：支持任意字段的值中包含关键词
     if keyword:
         if isinstance(result, list):
             result = [
-                item for item in result 
+                item for item in result
                 if keyword.lower() in json.dumps(item, ensure_ascii=False).lower()
             ]
         elif isinstance(result, dict):
-            # 对于字典，先查值，如果没匹配则返回原字典（机构信息通常全部返回）
+            # 对字典，动态匹配所有字段的值
             matched = {
-                k: v for k, v in result.items() 
+                k: v for k, v in result.items()
                 if keyword.lower() in k.lower() or keyword.lower() in str(v).lower()
             }
-            if matched:  # 有匹配才返回，否则保留原结果
+            if matched:
                 result = matched
-    
+            # 无匹配时返回全部（避免新字段被过滤掉）
+
     return result
 
 
@@ -153,50 +155,99 @@ def format_output(data, query_type: str) -> str:
     return str(data)
 
 
+def build_auto_mapping(data: dict) -> dict:
+    """
+    动态构建关键词映射，从数据中自动提取所有有意义的词
+    返回: {关键词: query_type}
+    """
+    mapping = {}
+
+    # 默认映射（兜底用）
+    defaults = {
+        "地址": "institution", "电话": "institution", "营业": "institution",
+        "停车": "institution", "介绍": "institution", "简介": "institution",
+        "怎么样": "institution", "正规": "institution", "伊芙丽格": "institution",
+        "evebeauty": "institution",
+        "痘坑": "project", "清新微波": "project", "除腋": "project", "miraDry": "project",
+        "吴凌燕": "doctor", "刘兰兰": "doctor", "院长": "doctor", "主任": "doctor",
+        "术后": "care", "护理": "care", "注意事项": "care", "恢复": "care",
+    }
+    mapping.update(defaults)
+
+    # 动态提取：从数据值中提取有意义的词作为关键词
+    for section, content in data.items():
+        if isinstance(content, dict):
+            # 机构信息等字典类型，提取值中的关键词
+            for k, v in content.items():
+                if isinstance(v, str) and len(v) > 5:
+                    # 长文本中提取品牌名、地名等
+                    for hint in ["伊芙丽格", "燕莎", "亮马桥", "朝阳"]:
+                        if hint in v:
+                            mapping[hint] = section
+        elif isinstance(content, list):
+            # 医生、项目、护理等列表
+            for item in content:
+                if isinstance(item, dict):
+                    name = item.get("name", "") or item.get("project", "")
+                    if name:
+                        mapping[name] = section
+                    # 从描述中提取关键词
+                    desc = item.get("description", "") or item.get("post_care", "")
+                    if isinstance(desc, str):
+                        for hint in ["痘坑", "清新微波", "腋汗", "腋臭", "光电", "皮肤科"]:
+                            if hint in desc:
+                                mapping[hint] = section
+
+    return mapping
+
+
 def main():
     parser = argparse.ArgumentParser(description="伊芙丽格信息查询")
     parser.add_argument("--query", "-q", type=str, required=True, help="查询类型或关键词")
-    parser.add_argument("--type", "-t", type=str, 
-                        choices=["institution", "doctor", "project", "care", "all"], 
+    parser.add_argument("--type", "-t", type=str,
+                        choices=["institution", "doctor", "project", "care", "all"],
                         help="查询类型", default=None)
     parser.add_argument("--config", "-c", type=str, help="配置文件路径", default=None)
-    
+
     args = parser.parse_args()
-    
+
     try:
-        # 自动判断查询类型
-        query_type = args.type
-        if not query_type:
-            # 根据关键词自动判断
-            auto_mapping = {
-                "地址": "institution",
-                "电话": "institution",
-                "营业": "institution",
-                "停车": "institution",
-                "痘坑": "project",
-                "清新微波": "project",
-                "除腋": "project",
-                "吴凌燕": "doctor",
-                "刘兰兰": "doctor",
-                "术后": "care",
-                "护理": "care"
-            }
-            for kw, qtype in auto_mapping.items():
-                if kw in args.query:
-                    query_type = qtype
-                    break
-            else:
-                query_type = "all"
-        
+        # 加载数据用于构建动态关键词映射
         config = None
         if args.config:
             with open(args.config, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-        
+
+        # 先加载数据
+        data_source = config.get("data_source", "local") if config else "local"
+        data = None
+        try:
+            if data_source == "github":
+                github_url = config.get("github_raw_url", "") if config else ""
+                if github_url:
+                    data = fetch_from_github_raw(github_url)
+            elif data_source == "local":
+                data_file = config.get("data_file", "info.json") if config else "info.json"
+                data = fetch_from_local_json(data_file)
+        except Exception:
+            pass  # 数据加载失败不影响后续逻辑
+
+        # 自动判断查询类型
+        query_type = args.type
+        if not query_type:
+            # 使用动态映射
+            auto_mapping = build_auto_mapping(data) if data else {}
+            for kw, qtype in auto_mapping.items():
+                if kw.lower() in args.query.lower():
+                    query_type = qtype
+                    break
+            else:
+                query_type = "all"
+
         result = query_info(query_type, args.query, config)
         output = format_output(result, query_type)
         print(output)
-        
+
     except Exception as e:
         print(f"查询失败: {e}", file=sys.stderr)
         sys.exit(1)
