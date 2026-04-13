@@ -1,0 +1,18 @@
+{
+  "name": "evebeauty-skill",
+  "description": "伊芙丽格医疗美容客服助手。查询机构信息、项目介绍、医生信息、术后护理等。数据来自外部源（GitHub/腾讯文档/本地JSON），实时更新无需修改Skill。",
+  "version": "0.1.0",
+  "author": "evebeauty",
+  "keywords": [
+    "伊芙丽格",
+    "evebeauty",
+    "医美",
+    "美容",
+    "痘坑修复",
+    "清新微波",
+    "miraDry",
+    "皮肤科",
+    "北京医美"
+  ],
+  "install_prompt": "安装后可以询问伊芙丽格医美机构的相关信息，如地址、项目、医生介绍、术后护理等。"
+}
