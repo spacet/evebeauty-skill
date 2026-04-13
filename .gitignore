@@ -20,12 +20,6 @@ wheels/
 .installed.cfg
 *.egg
 
-# Config
-config.json
-
-# Data (keep info.json as example, use separate file for production)
-# info.json
-
 # IDE
 .vscode/
 .idea/
