@@ -43,6 +43,7 @@ python scripts/fetch_info.py --query "用户问题"
 
 | 关键词 | 查询类型 |
 |--------|----------|
+| 介绍、简介、怎么样、正规吗 | institution（机构介绍） |
 | 地址、电话、营业、停车 | institution（机构信息） |
 | 痘坑、清新微波、除腋、项目名 | project（项目介绍） |
 | 吴凌燕、刘兰兰、医生名 | doctor（医生介绍） |
