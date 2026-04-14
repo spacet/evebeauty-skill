@@ -7,7 +7,7 @@ description: >
   痘坑修复、清新微波、miraDry、除腋臭、腋汗、吴凌燕、刘兰兰、燕莎美容、亮马桥医美、
   北京医美、朝阳区医美、皮肤科、激光美容、光电项目、微创、术后护理、恢复期等关键词时触发。
   功能：提供机构地址/营业时间/项目介绍/医生介绍/术后护理等客服咨询。
-version: 0.1.0
+version: 0.2.0
 license: MIT
 compatibility:
   - claude-code
@@ -22,14 +22,15 @@ compatibility:
 ## 用途
 
 当用户询问伊芙丽格医美机构的以下信息时，使用本 Skill 回复：
-- 机构信息：地址、电话、营业时间、停车
-- 项目介绍：痘坑修复、清新微波除腋汗腋臭
+- 机构信息：地址、电话、营业时间、停车、机构介绍
+- 服务项目：痘坑修复、清新微波除腋汗腋臭等
 - 医生介绍：吴凌燕院长、刘兰兰主任
+- 预约面诊流程
 - 术后护理注意事项
 
 ## 数据源
 
-**所有数据来自外部，Skill 本身不包含业务数据。**
+**所有数据来自 `references/` 目录下的 Markdown 文件，Skill 本身不包含业务数据。**
 
 ### 查询方式
 
@@ -37,17 +38,39 @@ compatibility:
 python scripts/fetch_info.py --query "用户问题"
 ```
 
+脚本会自动：
+1. 从关键词匹配对应文件
+2. 读取文件内容返回
+3. 无精确匹配时返回全部内容
+
 ### 数据类型自动识别
 
 脚本会**从数据中动态提取关键词**，自动判断查询类型。
 
-**无需在 Skill 中维护关键词列表**，任何新字段只要存在于数据中，脚本会自动识别并返回。
+**无需在 Skill 中维护关键词列表**，任何新文件只要存在于 `references/` 目录中，脚本会自动发现并返回。
 
-### 手动指定类型（可选）
+### 手动列出所有服务（调试用）
 
 ```bash
-python scripts/fetch_info.py --query "关键词" --type doctor
+python scripts/fetch_info.py --list
 ```
+
+## 目录结构
+
+```
+references/
+├── institution.md              ← 机构信息（地址、电话、营业时间、介绍）
+├── appointment.md              ← 预约面诊
+├── doctors/
+│   ├── wu-lingyan.md           ← 吴凌燕院长
+│   └── liu-lanlan.md           ← 刘兰兰主任
+└── services/
+    ├── doukeng-xiufu.md        ← 痘坑修复
+    ├── qingxin-weibo.md        ← 清新微波除腋汗腋臭
+    └── ...                     ← 每个服务一个文件
+```
+
+**新增服务/医生只需在对应目录下新建 Markdown 文件，脚本自动发现。**
 
 ## 回复规则
 
@@ -56,23 +79,13 @@ python scripts/fetch_info.py --query "关键词" --type doctor
 3. **找不到信息时**，回复"暂未收录该信息，请联系客服确认"
 4. **脚本报错时**，回复"系统查询异常，请拨打客服热线咨询"
 
-## 数据源配置
-
-修改 `data/config.json` 可切换数据源：
-
-| 模式 | 配置 | 说明 |
-|------|------|------|
-| GitHub Raw | `"data_source": "github"` | 通过 HTTP GET 实时拉取 GitHub 仓库中的 JSON |
-| 本地 JSON | `"data_source": "local"` | 读取 `data/info.json` |
-| 腾讯文档 | `"data_source": "tencent_docs"` | 需 API 权限（待实现） |
-
 ## 更新数据
 
 **无需修改 Skill 文件！**
 
-- **GitHub 模式**：在仓库修改 `data/info.json` 并提交，实时同步
-- **本地模式**：替换 `data/info.json` 文件
-- **腾讯文档模式**：直接在表格中修改
+- 新增服务：在 `references/services/` 下新建 `.md` 文件
+- 新增医生：在 `references/doctors/` 下新建 `.md` 文件
+- 修改内容：直接编辑对应 Markdown 文件
 
 ## 示例
 
@@ -80,16 +93,16 @@ python scripts/fetch_info.py --query "关键词" --type doctor
 
 运行：`python scripts/fetch_info.py --query "地址"`
 
-返回结果后，照实回复用户。
+返回 `institution.md` 内容，照实回复。
 
 ### 用户问：痘坑修复怎么做的？
 
 运行：`python scripts/fetch_info.py --query "痘坑修复"`
 
-返回项目介绍和术后护理信息，照实回复。
+返回 `services/doukeng-xiufu.md` 内容，照实回复。
 
 ### 用户问：吴凌燕医生怎么样？
 
 运行：`python scripts/fetch_info.py --query "吴凌燕"`
 
-返回医生介绍，照实回复。
+返回 `doctors/wu-lingyan.md` 内容，照实回复。

@@ -1,8 +1,11 @@
 {
   "name": "evebeauty-skill",
+  "display_name": "伊芙丽格医疗美容客服助手",
   "description": "伊芙丽格医疗美容(EveBeauty)客服助手。用户提到伊芙丽格、evebeauty、医美、美容、皮肤科、痘坑、祛斑、抗衰、热玛吉、脱毛、美白、吴凌燕、刘兰兰、北京医美等关键词时触发。提供机构地址/营业时间/项目介绍/医生介绍/术后护理等客服咨询。",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "evebeauty",
+  "license": "MIT",
+  "category": "客服查询",
   "keywords": [
     "伊芙丽格",
     "evebeauty",
@@ -40,5 +43,5 @@
     "微创",
     "术后护理"
   ],
-  "install_prompt": "安装后可以询问伊芙丽格医美机构的相关信息，如地址、项目、医生介绍（含图片）、术后护理等。"
+  "install_prompt": "安装后可以询问伊芙丽格医美机构的相关信息，如地址、项目、医生介绍、术后护理等。数据以 Markdown 文件管理，新增服务/医生只需新建文件。"
 }

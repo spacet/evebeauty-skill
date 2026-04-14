@@ -1,6 +1,7 @@
 # EveBeauty Skill - 伊芙丽格医美客服助手
 
 > 一个兼容多平台的 AI Agent Skill，提供伊芙丽格医疗美容机构的客服查询服务。
+> 数据以 Markdown 文件管理，新增服务/医生只需新建文件，无需修改 Skill 代码。
 
 ## 兼容平台
 
@@ -16,26 +17,35 @@
 
 ## 功能
 
-- 机构信息查询（地址、电话、营业时间、停车）
-- 项目介绍（痘坑修复、清新微波除腋汗腋臭）
+- 机构信息查询（地址、电话、营业时间、停车、机构介绍）
+- 服务项目查询（痘坑修复、清新微波除腋汗腋臭等，每个服务独立文件）
 - 医生介绍（吴凌燕院长、刘兰兰主任）
-- 术后护理注意事项查询
+- 预约面诊流程
+- 术后护理注意事项
 
 ## 数据架构
 
-**数据与 Skill 完全解耦**，所有数据来自外部源：
+**数据与 Skill 完全解耦**，所有数据为 `references/` 目录下的 Markdown 文件：
 
 ```
-数据源 → scripts/fetch_info.py → Agent 回复
+references/
+├── institution.md              ← 机构信息
+├── appointment.md              ← 预约面诊
+├── doctors/
+│   ├── wu-lingyan.md           ← 吴凌燕院长
+│   └── liu-lanlan.md           ← 刘兰兰主任
+└── services/
+    ├── doukeng-xiufu.md        ← 痘坑修复
+    ├── qingxin-weibo.md        ← 清新微波
+    └── ...                     ← 每个服务一个文件
 ```
 
-| 数据源 | 配置 | 更新方式 |
-|--------|------|----------|
-| GitHub Raw | `data_source: github` | 修改 JSON 并提交，实时同步 |
-| 本地 JSON | `data_source: local` | 替换 `data/info.json` |
-| 腾讯文档 | `data_source: tencent_docs` | 表格中直接修改（需 API） |
-
-**核心优势：更新数据无需修改任何 Skill 文件。**
+**核心优势：**
+- ✅ Markdown 格式，自然语言编写，无需 JSON 格式
+- ✅ 每个服务/医生独立文件，编辑互不干扰
+- ✅ 支持任意复杂结构（标题、列表、表格）
+- ✅ Agent 天然能读，LLM 最熟悉的格式
+- ✅ 新增 = 新建文件，零代码改动
 
 ## 快速开始
 
@@ -43,13 +53,11 @@
 
 **Claude Code / OpenClaw / Qwen Code / Codex：**
 ```bash
-# 克隆或复制到此平台的标准 Skill 路径
 git clone https://github.com/spacet/evebeauty-skill.git ~/.agents/skills/evebeauty-skill
 ```
 
 **Cursor：**
 ```bash
-# 复制适配文件到项目规则目录
 cp adapters/cursor/rules/evebeauty.mdc .cursor/rules/
 ```
 
@@ -68,53 +76,42 @@ cd evebeauty-skill
 python scripts/fetch_info.py --query "地址"
 python scripts/fetch_info.py --query "痘坑修复"
 python scripts/fetch_info.py --query "吴凌燕"
+python scripts/fetch_info.py --list    # 列出所有服务
 ```
 
-## 目录结构
+## 添加新服务
 
-```
-evebeauty-skill/
-├── SKILL.md                    ← 通用标准文件（Claude/OpenClaw/Qwen/Codex）
-├── skill.json                  ← Qwen Code 专用元数据（可选）
-├── README.md                   ← 本文件
-├── scripts/
-│   └── fetch_info.py           ← 通用查询脚本（Python 标准库）
-├── data/
-│   ├── config.json             ← 数据源配置
-│   └── info.json               ← 示例数据
-└── adapters/
-    └── cursor/
-        └── rules/
-            └── evebeauty.mdc   ← Cursor 专用适配文件
-```
+1. 在 `references/services/` 下新建 `.md` 文件，如 `remaji.md`
+2. 用 Markdown 格式写入服务信息（简介、适应症、禁忌、疗程、术后护理等）
+3. 提交即可，脚本自动发现
 
-## 数据格式
+**示例文件：**
+```markdown
+# 热玛吉
 
-`data/info.json` 结构：
+## 简介
+...
 
-```json
-{
-  "institution": { "address": "...", "phone": "...", "hours": "..." },
-  "doctors": [{ "name": "...", "title": "...", "description": "..." }],
-  "projects": [{ "name": "...", "description": "..." }],
-  "care_instructions": [{ "project": "...", "post_care": "..." }]
-}
+## 适应症
+- ...
+
+## 禁忌
+- ...
+
+## 疗程
+...
+
+## 术后护理
+...
 ```
 
 ## 自定义扩展
 
-### 添加新字段
-1. 在 `data/info.json` 中添加新键值对
-2. 脚本自动返回，无需修改代码
-3. 如需智能查询，告诉我关键词，我更新映射
+- **添加新医生**：在 `references/doctors/` 下新建文件
+- **添加新服务**：在 `references/services/` 下新建文件
+- **修改内容**：直接编辑对应 Markdown 文件
 
-### 添加新项目/医生
-在对应数组中添加对象即可，如：
-```json
-{
-  "doctors": [...existing, { "name": "新医生", "title": "...", "description": "..." }]
-}
-```
+**更新数据无需修改任何 Skill 代码。**
 
 ## License
 

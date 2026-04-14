@@ -2,252 +2,220 @@
 # -*- coding: utf-8 -*-
 """
 伊芙丽格信息查询脚本
-支持多种数据源：GitHub Raw URL / 本地JSON / 腾讯文档API
+从 references/ 目录读取 Markdown 文件返回
 """
 
-import json
 import argparse
-import sys
 import os
+import sys
 from pathlib import Path
 
-try:
-    import urllib.request
-    import urllib.error
-    HAS_URLLIB = True
-except ImportError:
-    HAS_URLLIB = False
-
-# 配置文件路径
+# 路径
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-CONFIG_FILE = PROJECT_ROOT / "data" / "config.json"
+REFS_DIR = PROJECT_ROOT / "references"
 
 
-def load_config():
-    """加载配置"""
-    if not CONFIG_FILE.exists():
-        raise FileNotFoundError(f"配置文件不存在: {CONFIG_FILE}")
-    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def read_markdown(path: str) -> str:
+    """读取 Markdown 文件"""
+    file_path = Path(path)
+    if not file_path.exists():
+        return None
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return f.read()
 
 
-def fetch_from_github_raw(url: str) -> dict:
-    """从 GitHub Raw URL 获取数据"""
-    if not HAS_URLLIB:
-        raise ImportError("urllib 模块不可用")
-    
-    try:
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'EveBeauty-Skill/1.0')
-        
-        with urllib.request.urlopen(req, timeout=10) as response:
-            raw_data = response.read().decode('utf-8')
-            return json.loads(raw_data)
-    except urllib.error.HTTPError as e:
-        raise ConnectionError(f"GitHub Raw URL 请求失败: {e.code} {e.reason}")
-    except urllib.error.URLError as e:
-        raise ConnectionError(f"无法访问 GitHub Raw URL: {e.reason}")
-    except json.JSONDecodeError as e:
-        raise ValueError(f"JSON 解析失败: {e}")
+def discover_services() -> list:
+    """自动发现 services/ 目录下所有服务文件"""
+    services_dir = REFS_DIR / "services"
+    if not services_dir.exists():
+        return []
+    return [
+        f.stem for f in services_dir.glob("*.md")
+    ]
 
 
-def fetch_from_local_json(data_file: str) -> dict:
-    """从本地JSON文件读取"""
-    data_path = PROJECT_ROOT / "data" / data_file
-    if not data_path.exists():
-        raise FileNotFoundError(f"数据文件不存在: {data_path}")
-    with open(data_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def discover_doctors() -> list:
+    """自动发现 doctors/ 目录下所有医生文件"""
+    doctors_dir = REFS_DIR / "doctors"
+    if not doctors_dir.exists():
+        return []
+    return [
+        f.stem for f in doctors_dir.glob("*.md")
+    ]
 
 
-def fetch_from_tencent_docs(config: dict) -> dict:
+def build_keyword_index() -> dict:
     """
-    从腾讯文档读取数据
-    需要腾讯文档开放平台 API 权限
+    构建关键词索引
+    返回: {关键词: 文件相对路径}
     """
-    raise NotImplementedError(
-        "腾讯文档API需要额外配置。\n"
-        "请切换到 GitHub Raw 或本地JSON模式。"
-    )
+    index = {}
 
-
-def query_info(query_type: str, keyword: str = None, config: dict = None):
-    """
-    查询信息
-
-    Args:
-        query_type: 查询类型 (institution/doctor/project/care/all)
-        keyword: 关键词
-        config: 配置字典
-    """
-    if config is None:
-        config = load_config()
-
-    data_source = config.get("data_source", "local")
-
-    # 根据数据源获取数据
-    if data_source == "github":
-        github_url = config.get("github_raw_url")
-        if not github_url:
-            raise ValueError("配置中未设置 github_raw_url")
-        data = fetch_from_github_raw(github_url)
-    elif data_source == "tencent_docs":
-        data = fetch_from_tencent_docs(config)
-    else:  # local
-        data_file = config.get("data_file", "info.json")
-        data = fetch_from_local_json(data_file)
-
-    # 根据query_type筛选
-    if query_type != "all" and query_type in data:
-        result = data[query_type]
-    else:
-        result = data  # 返回全部
-
-    # 如果有keyword，进一步筛选
-    # 动态匹配：支持任意字段的值中包含关键词
-    if keyword:
-        if isinstance(result, list):
-            result = [
-                item for item in result
-                if keyword.lower() in json.dumps(item, ensure_ascii=False).lower()
-            ]
-        elif isinstance(result, dict):
-            # 对字典，动态匹配所有字段的值
-            matched = {
-                k: v for k, v in result.items()
-                if keyword.lower() in k.lower() or keyword.lower() in str(v).lower()
-            }
-            if matched:
-                result = matched
-            # 无匹配时返回全部（避免新字段被过滤掉）
-
-    return result
-
-
-def format_output(data, query_type: str) -> str:
-    """格式化输出"""
-    if isinstance(data, list):
-        if not data:
-            return "未找到相关信息。"
-        parts = []
-        for item in data:
-            if isinstance(item, dict):
-                # 对字典，格式化输出每个键值对
-                parts.append("\n".join(f"{k}: {v}" for k, v in item.items() if v))
-            else:
-                parts.append(str(item))
-        return "\n\n---\n\n".join(parts)
-    elif isinstance(data, dict):
-        # 检查值是否是列表（如 projects/doctors），需要展开
-        parts = []
-        for k, v in data.items():
-            if isinstance(v, list):
-                # 列表类型，展开每个项目
-                for item in v:
-                    if isinstance(item, dict):
-                        parts.append(f"{k}:\n" + "\n".join(f"  {ik}: {iv}" for ik, iv in item.items() if iv))
-                    else:
-                        parts.append(f"{k}: {item}")
-            else:
-                parts.append(f"{k}: {v}")
-        return "\n\n".join(parts)
-    return str(data)
-
-
-def build_auto_mapping(data: dict) -> dict:
-    """
-    动态构建关键词映射，从数据中自动提取所有有意义的词
-    返回: {关键词: query_type}
-    """
-    mapping = {}
-
-    # 默认映射（兜底用）
+    # 固定映射（兜底）
     defaults = {
-        "地址": "institution", "电话": "institution", "营业": "institution",
-        "停车": "institution", "介绍": "institution", "简介": "institution",
-        "怎么样": "institution", "正规": "institution", "伊芙丽格": "institution",
-        "evebeauty": "institution",
-        "痘坑": "project", "清新微波": "project", "除腋": "project", "miraDry": "project",
-        "吴凌燕": "doctor", "刘兰兰": "doctor", "院长": "doctor", "主任": "doctor",
-        "术后": "care", "护理": "care", "注意事项": "care", "恢复": "care",
+        "地址": "institution.md",
+        "电话": "institution.md",
+        "营业": "institution.md",
+        "停车": "institution.md",
+        "介绍": "institution.md",
+        "简介": "institution.md",
+        "怎么样": "institution.md",
+        "正规": "institution.md",
+        "伊芙丽格": "institution.md",
+        "evebeauty": "institution.md",
+        "燕莎": "institution.md",
+        "亮马桥": "institution.md",
+        "预约": "appointment.md",
+        "面诊": "appointment.md",
+        "术后": "services/",  # 特殊：搜索所有服务
+        "护理": "services/",
+        "注意事项": "services/",
+        "恢复": "services/",
+        "疗程": "services/",
     }
-    mapping.update(defaults)
+    index.update(defaults)
 
-    # 动态提取：从数据值中提取有意义的词作为关键词
-    for section, content in data.items():
-        if isinstance(content, dict):
-            # 机构信息等字典类型，提取值中的关键词
-            for k, v in content.items():
-                if isinstance(v, str) and len(v) > 5:
-                    # 长文本中提取品牌名、地名等
-                    for hint in ["伊芙丽格", "燕莎", "亮马桥", "朝阳"]:
-                        if hint in v:
-                            mapping[hint] = section
-        elif isinstance(content, list):
-            # 医生、项目、护理等列表
-            for item in content:
-                if isinstance(item, dict):
-                    name = item.get("name", "") or item.get("project", "")
-                    if name:
-                        mapping[name] = section
-                    # 从描述中提取关键词
-                    desc = item.get("description", "") or item.get("post_care", "")
-                    if isinstance(desc, str):
-                        for hint in ["痘坑", "清新微波", "腋汗", "腋臭", "光电", "皮肤科"]:
-                            if hint in desc:
-                                mapping[hint] = section
+    # 动态提取医生名
+    for stem in discover_doctors():
+        # 文件名转中文显示名（简单映射）
+        name_map = {
+            "wu-lingyan": "吴凌燕",
+            "liu-lanlan": "刘兰兰",
+        }
+        display_name = name_map.get(stem, stem)
+        index[display_name] = f"doctors/{stem}.md"
+        index[stem] = f"doctors/{stem}.md"
 
-    return mapping
+    # 动态提取服务名和文件名
+    services = discover_services()
+    service_name_map = {
+        "doukeng-xiufu": ("痘坑修复", "痘坑"),
+        "qingxin-weibo": ("清新微波除腋汗腋臭", "清新微波", "除腋臭", "腋汗", "miraDry"),
+    }
+    for stem in services:
+        file_path = f"services/{stem}.md"
+        # 读取文件第一行提取服务名
+        full_path = REFS_DIR / file_path
+        if full_path.exists():
+            with open(full_path, 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip().lstrip("# ").strip()
+                if first_line:
+                    index[first_line] = file_path
+        # 添加别名
+        if stem in service_name_map:
+            for alias in service_name_map[stem]:
+                index[alias] = file_path
+        index[stem] = file_path
+
+    return index
+
+
+def find_matching_files(query: str) -> list:
+    """
+    根据查询字符串匹配相关文件
+    返回: [(文件相对路径, 匹配度), ...]
+    """
+    index = build_keyword_index()
+    matches = []
+    query_lower = query.lower()
+
+    # 精确匹配
+    for keyword, path in index.items():
+        if keyword.lower() in query_lower:
+            if path.endswith("/"):
+                # 目录型：返回目录下所有文件
+                dir_path = REFS_DIR / path.rstrip("/")
+                if dir_path.exists():
+                    for f in dir_path.glob("*.md"):
+                        matches.append((f.relative_to(REFS_DIR), 1))
+            else:
+                matches.append((path, 2))  # 精确匹配权重高
+
+    # 去重
+    seen = set()
+    unique = []
+    for path, score in sorted(matches, key=lambda x: -x[1]):
+        if path not in seen:
+            seen.add(path)
+            unique.append((path, score))
+
+    return unique
+
+
+def query_info(query: str) -> str:
+    """
+    查询信息，返回格式化结果
+    """
+    matches = find_matching_files(query)
+
+    if not matches:
+        # 无匹配，返回全部内容
+        return _get_all_content()
+
+    parts = []
+    for path, _score in matches:
+        full_path = REFS_DIR / path
+        content = read_markdown(full_path)
+        if content:
+            parts.append(content)
+
+    if not parts:
+        return "暂未收录该信息，请联系客服确认。"
+
+    return "\n\n---\n\n".join(parts)
+
+
+def _get_all_content() -> str:
+    """获取全部内容"""
+    parts = []
+    # 机构信息
+    inst = read_markdown(REFS_DIR / "institution.md")
+    if inst:
+        parts.append(inst)
+    # 医生
+    doctors_dir = REFS_DIR / "doctors"
+    if doctors_dir.exists():
+        for f in sorted(doctors_dir.glob("*.md")):
+            parts.append(read_markdown(f))
+    # 服务
+    services_dir = REFS_DIR / "services"
+    if services_dir.exists():
+        for f in sorted(services_dir.glob("*.md")):
+            parts.append(read_markdown(f))
+    # 预约
+    appt = read_markdown(REFS_DIR / "appointment.md")
+    if appt:
+        parts.append(appt)
+    return "\n\n---\n\n".join(parts)
 
 
 def main():
     parser = argparse.ArgumentParser(description="伊芙丽格信息查询")
-    parser.add_argument("--query", "-q", type=str, required=True, help="查询类型或关键词")
-    parser.add_argument("--type", "-t", type=str,
-                        choices=["institution", "doctor", "project", "care", "all"],
-                        help="查询类型", default=None)
-    parser.add_argument("--config", "-c", type=str, help="配置文件路径", default=None)
+    parser.add_argument("--query", "-q", type=str, help="查询关键词")
+    parser.add_argument("--list", action="store_true", help="列出所有可用服务")
 
     args = parser.parse_args()
 
+    if args.list:
+        print("=== 机构信息 ===")
+        print("institution.md")
+        print("\n=== 医生介绍 ===")
+        for d in discover_doctors():
+            print(f"doctors/{d}.md")
+        print("\n=== 服务项目 ===")
+        for s in discover_services():
+            print(f"services/{s}.md")
+        print("\n=== 其他 ===")
+        print("appointment.md")
+        return
+
+    if not args.query:
+        parser.error("必须指定 --query 或 --list")
+
     try:
-        # 加载数据用于构建动态关键词映射
-        config = None
-        if args.config:
-            with open(args.config, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-
-        # 先加载数据
-        data_source = config.get("data_source", "local") if config else "local"
-        data = None
-        try:
-            if data_source == "github":
-                github_url = config.get("github_raw_url", "") if config else ""
-                if github_url:
-                    data = fetch_from_github_raw(github_url)
-            elif data_source == "local":
-                data_file = config.get("data_file", "info.json") if config else "info.json"
-                data = fetch_from_local_json(data_file)
-        except Exception:
-            pass  # 数据加载失败不影响后续逻辑
-
-        # 自动判断查询类型
-        query_type = args.type
-        if not query_type:
-            # 使用动态映射
-            auto_mapping = build_auto_mapping(data) if data else {}
-            for kw, qtype in auto_mapping.items():
-                if kw.lower() in args.query.lower():
-                    query_type = qtype
-                    break
-            else:
-                query_type = "all"
-
-        result = query_info(query_type, args.query, config)
-        output = format_output(result, query_type)
-        print(output)
-
+        result = query_info(args.query)
+        print(result)
     except Exception as e:
         print(f"查询失败: {e}", file=sys.stderr)
         sys.exit(1)
